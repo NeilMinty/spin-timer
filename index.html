@@ -475,8 +475,7 @@ function savePL(key,inputId,msgId){
 function wirePL(key,inputId,msgId){
   const input=$(inputId);
   input.addEventListener('blur',()=>savePL(key,inputId,msgId));
-  input.addEventListener('paste',()=>setTimeout(()=>savePL(key,inputId,msgId),0));
-  input.addEventListener('input',()=>{const m=$(msgId);m.textContent='';m.className='sp-msg';});
+  input.addEventListener('input',()=>savePL(key,inputId,msgId));
 }
 wirePL('sp_ride_playlist','sp-ride','sp-ride-msg');
 wirePL('sp_sprint_playlist','sp-sprint','sp-sprint-msg');
