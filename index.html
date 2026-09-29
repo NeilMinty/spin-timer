@@ -76,6 +76,17 @@ nav{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:10px;margin-top:14px}
 nav button{height:60px;border:0;border-radius:14px;background:rgba(255,255,255,.16);color:#fff;font-size:18px;font-weight:600}
 nav #play{background:#fff;color:#15212C}
 
+/* Spotify */
+.sp-section{margin-bottom:20px}
+.sp-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.sp-btn{border:1px solid var(--line);background:transparent;border-radius:20px;padding:8px 14px;font-size:15px}
+.sp-ok{color:var(--muted);font-size:15px}
+.sp-link{background:transparent;border:0;color:var(--muted);font-size:14px;text-decoration:underline;padding:0;cursor:pointer}
+.sp-fields{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.sp-fields label{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.sp-fields input{padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:15px}
+#sp-status{font-size:13px;opacity:.65;min-height:1.2em;margin-top:6px}
+
 /* Done */
 #done{max-width:560px;margin:0 auto;padding:40px 20px}
 #done h2{font-family:var(--num);font-size:44px;margin:0 0 6px}
@@ -97,6 +108,21 @@ nav #play{background:#fff;color:#15212C}
     <button data-w="4" aria-pressed="false">4</button>
   </div>
   <button class="voice" id="voice" aria-pressed="true">Voice callouts: on</button>
+  <div class="sp-section">
+    <div id="sp-disconnected">
+      <button class="sp-btn" id="sp-connect">Connect Spotify</button>
+    </div>
+    <div id="sp-connected" hidden>
+      <div class="sp-row">
+        <span class="sp-ok">Spotify connected</span>
+        <button class="sp-link" id="sp-disconnect">Disconnect</button>
+      </div>
+      <div class="sp-fields">
+        <label>Ride playlist<input type="url" id="sp-ride" placeholder="Paste Spotify playlist link"></label>
+        <label>Sprint playlist<input type="url" id="sp-sprint" placeholder="Paste Spotify playlist link"></label>
+      </div>
+    </div>
+  </div>
   <div id="list"></div>
   <p class="note">Beeps on the last three seconds of each block. The screen stays awake while a session runs, where your browser allows it. Turn your volume up.</p>
 </main>
@@ -114,6 +140,7 @@ nav #play{background:#fff;color:#15212C}
     <div class="t"><span>Effort</span><b id="rpe"></b></div>
   </div>
   <div id="next"></div>
+  <div id="sp-status"></div>
   <div class="bar"><i id="prog"></i></div>
   <nav><button id="back">Back</button><button id="play">Pause</button><button id="skip">Skip</button></nav>
 </section>
@@ -214,6 +241,7 @@ function announce(){
   $('call').textContent=c;
   $('call').classList.remove('flash');void $('call').offsetWidth;$('call').classList.add('flash');
   say(s.zone==='easy'||s.zone==='warm'||s.zone==='cool'?c:`${c} Resistance ${s.res.split('–')[0]}`);
+  spotifyOnSegment(plan[idx]);
 }
 $('voice').onclick=()=>{voice=!voice;$('voice').setAttribute('aria-pressed',voice);$('voice').textContent='Voice callouts: '+(voice?'on':'off')};
 
@@ -260,6 +288,7 @@ function start(s){
   S=s;plan=s.build(week);idx=0;el=0;beeped=-1;
   $('home').hidden=true;$('done').hidden=true;$('run').hidden=false;
   $('sname').textContent=`Session ${s.id}: ${s.name}`;
+  inSprintSet=false;spStatus('');
   play();announce();
 }
 function play(){running=true;last=performance.now();$('play').textContent='Pause';lock();
@@ -314,6 +343,137 @@ $('quit').onclick=()=>{
   quitArm=setTimeout(()=>{$('quit').textContent='End';quitArm=null},3000);
 };
 $('home-btn').onclick=()=>{$('done').hidden=true;$('home').hidden=false};
+
+// ── Spotify ──────────────────────────────────────────────────────────────────
+const SP_CLIENT_ID='c316f85007df44efb782179d3554b4ba';
+const SP_REDIRECT=location.origin+'/callback';
+const SP_SCOPES='user-modify-playback-state user-read-playback-state';
+
+function b64url(buf){
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+async function pkceChallenge(){
+  const arr=new Uint8Array(96);crypto.getRandomValues(arr);
+  const verifier=b64url(arr);
+  const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
+  return{verifier,challenge:b64url(hash)};
+}
+
+async function spLogin(){
+  const{verifier,challenge}=await pkceChallenge();
+  localStorage.setItem('sp_verifier',verifier);
+  const p=new URLSearchParams({client_id:SP_CLIENT_ID,response_type:'code',
+    redirect_uri:SP_REDIRECT,scope:SP_SCOPES,
+    code_challenge_method:'S256',code_challenge:challenge});
+  location.href='https://accounts.spotify.com/authorize?'+p;
+}
+
+async function spExchange(code){
+  const r=await fetch('https://accounts.spotify.com/api/token',{
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({grant_type:'authorization_code',code,
+      redirect_uri:SP_REDIRECT,client_id:SP_CLIENT_ID,
+      code_verifier:localStorage.getItem('sp_verifier')||''})
+  });
+  const d=await r.json();
+  if(d.access_token)spSave(d);
+}
+
+function spSave(d){
+  if(!d.access_token)return;
+  localStorage.setItem('sp_access',d.access_token);
+  if(d.refresh_token)localStorage.setItem('sp_refresh',d.refresh_token);
+  localStorage.setItem('sp_exp',Date.now()+d.expires_in*1000);
+}
+
+async function spToken(){
+  const t=localStorage.getItem('sp_access');
+  if(!t)return null;
+  if(Date.now()<+localStorage.getItem('sp_exp')-60000)return t;
+  const rt=localStorage.getItem('sp_refresh');
+  if(!rt)return null;
+  try{
+    const r=await fetch('https://accounts.spotify.com/api/token',{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({grant_type:'refresh_token',
+        refresh_token:rt,client_id:SP_CLIENT_ID})
+    });
+    const d=await r.json();
+    spSave(d);return d.access_token||null;
+  }catch(e){return null;}
+}
+
+function spDisconnect(){
+  ['sp_access','sp_refresh','sp_exp','sp_verifier'].forEach(k=>localStorage.removeItem(k));
+  renderSP();
+}
+
+function parsePid(url){
+  const m=(url||'').match(/playlist[:/]([A-Za-z0-9]+)/);
+  return m?m[1]:null;
+}
+
+function spStatus(msg){const el=$('sp-status');if(el)el.textContent=msg||'';}
+
+async function spPlay(pid){
+  if(!pid)return;
+  const token=await spToken();
+  if(!token){spStatus('Spotify: not connected');return;}
+  const h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+  try{
+    const r=await fetch('https://api.spotify.com/v1/me/player/play',{
+      method:'PUT',headers:h,
+      body:JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}})
+    });
+    if(r.status===404)spStatus('Spotify: no active device');
+    else if(r.ok||r.status===204){
+      spStatus('');
+      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true',{method:'PUT',headers:h}).catch(()=>{});
+    }
+    else spStatus('Spotify: error '+r.status);
+  }catch(e){spStatus('Spotify: unavailable');}
+}
+
+let inSprintSet=false;
+function isSprintSeg(s){return s.label.startsWith('Sprint')||s.label.startsWith('Tabata');}
+
+function spotifyOnSegment(s){
+  if(!s)return;
+  const sprint=isSprintSeg(s);
+  const rideId=parsePid(localStorage.getItem('sp_ride_playlist')||'');
+  const sprintId=parsePid(localStorage.getItem('sp_sprint_playlist')||'');
+  if(sprint&&!inSprintSet){inSprintSet=true;spPlay(sprintId).catch(()=>{});}
+  else if(!sprint&&inSprintSet){inSprintSet=false;spPlay(rideId).catch(()=>{});}
+}
+
+function renderSP(){
+  const ok=!!localStorage.getItem('sp_access');
+  $('sp-disconnected').hidden=ok;
+  $('sp-connected').hidden=!ok;
+  if(ok){
+    $('sp-ride').value=localStorage.getItem('sp_ride_playlist')||'';
+    $('sp-sprint').value=localStorage.getItem('sp_sprint_playlist')||'';
+  }
+}
+
+$('sp-connect').onclick=()=>spLogin();
+$('sp-disconnect').onclick=()=>spDisconnect();
+$('sp-ride').oninput=()=>localStorage.setItem('sp_ride_playlist',$('sp-ride').value);
+$('sp-sprint').oninput=()=>localStorage.setItem('sp_sprint_playlist',$('sp-sprint').value);
+
+(async()=>{
+  const p=new URLSearchParams(location.search);
+  const code=p.get('code');
+  if(code&&location.pathname==='/callback'){
+    history.replaceState({},'','/');
+    try{await spExchange(code);}catch(e){}
+  }
+  renderSP();
+})();
+// ─────────────────────────────────────────────────────────────────────────────
 
 renderList();
 </script>
