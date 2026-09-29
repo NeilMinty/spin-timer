@@ -85,10 +85,10 @@ nav #play{background:#fff;color:#15212C}
 .sp-fields{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .sp-fields label{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
 .sp-fields input{padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:15px}
-.sp-lrow{display:flex;align-items:center;gap:6px}
-.sp-msg{font-size:12px;font-weight:500}
+.sp-msg{font-size:12px;font-weight:500;min-height:1.2em;margin-bottom:4px}
 .sp-msg.ok{color:#3a9a3a}
 .sp-msg.err{color:var(--accent)}
+.sp-save{margin-top:4px;border:1px solid var(--line);background:transparent;border-radius:20px;padding:8px 14px;font-size:15px}
 #sp-status{font-size:13px;opacity:.65;min-height:1.2em;margin-top:6px}
 
 /* Done */
@@ -122,8 +122,11 @@ nav #play{background:#fff;color:#15212C}
         <button class="sp-link" id="sp-disconnect">Disconnect</button>
       </div>
       <div class="sp-fields">
-        <label><span class="sp-lrow">Ride playlist<span id="sp-ride-msg" class="sp-msg"></span></span><input type="url" id="sp-ride" placeholder="Paste Spotify playlist link"></label>
-        <label><span class="sp-lrow">Sprint playlist<span id="sp-sprint-msg" class="sp-msg"></span></span><input type="url" id="sp-sprint" placeholder="Paste Spotify playlist link"></label>
+        <label>Ride playlist<input type="url" id="sp-ride" placeholder="Paste Spotify playlist link"></label>
+        <div id="sp-ride-msg" class="sp-msg"></div>
+        <label>Sprint playlist<input type="url" id="sp-sprint" placeholder="Paste Spotify playlist link"></label>
+        <div id="sp-sprint-msg" class="sp-msg"></div>
+        <button class="sp-save" id="sp-save">Save playlists</button>
       </div>
     </div>
   </div>
@@ -465,20 +468,18 @@ function renderSP(){
 
 $('sp-connect').onclick=()=>spLogin();
 $('sp-disconnect').onclick=()=>spDisconnect();
-function savePL(key,inputId,msgId){
-  const input=$( inputId),msg=$(msgId),val=input.value.trim();
-  if(!val){msg.textContent='';msg.className='sp-msg';return;}
-  const pid=parsePid(val);
-  if(pid){localStorage.setItem(key,val);msg.textContent='Saved';msg.className='sp-msg ok';}
-  else{msg.textContent='Not a playlist link';msg.className='sp-msg err';}
+function savePLField(key,inputId,msgId){
+  const val=$( inputId).value.trim(),msg=$(msgId);
+  if(!val){localStorage.removeItem(key);msg.textContent='';msg.className='sp-msg';return true;}
+  if(parsePid(val)){localStorage.setItem(key,val);msg.textContent='Saved';msg.className='sp-msg ok';return true;}
+  msg.textContent="That's not a playlist link";msg.className='sp-msg err';return false;
 }
-function wirePL(key,inputId,msgId){
-  const input=$(inputId);
-  input.addEventListener('blur',()=>savePL(key,inputId,msgId));
-  input.addEventListener('input',()=>savePL(key,inputId,msgId));
-}
-wirePL('sp_ride_playlist','sp-ride','sp-ride-msg');
-wirePL('sp_sprint_playlist','sp-sprint','sp-sprint-msg');
+$('sp-save').onclick=()=>{
+  savePLField('sp_ride_playlist','sp-ride','sp-ride-msg');
+  savePLField('sp_sprint_playlist','sp-sprint','sp-sprint-msg');
+};
+$('sp-ride').addEventListener('input',()=>{$('sp-ride-msg').textContent='';$('sp-ride-msg').className='sp-msg';});
+$('sp-sprint').addEventListener('input',()=>{$('sp-sprint-msg').textContent='';$('sp-sprint-msg').className='sp-msg';});
 
 (async()=>{
   const p=new URLSearchParams(location.search);
