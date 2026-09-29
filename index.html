@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Spin timer</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EEF2; --ink:#15212C; --muted:#56636F; --line:#C9D2DA; --card:#FFFFFF; --accent:#B23A0E;
+  --num:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --txt:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#15212C;--ink:#EEF2F5;--muted:#9AA7B3;--line:#2C3B49;--card:#1D2B38;--accent:#F0703A;}
+}
+:root[data-theme="dark"]{--bg:#15212C;--ink:#EEF2F5;--muted:#9AA7B3;--line:#2C3B49;--card:#1D2B38;--accent:#F0703A;}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:var(--txt);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+
+/* Home */
+#home{max-width:560px;margin:0 auto;padding:28px 20px 40px}
+#home h1{font-family:var(--num);font-weight:700;font-size:44px;line-height:1;margin:0 0 6px}
+#home .sub{color:var(--muted);margin:0 0 28px;font-size:16px}
+.weeks{display:flex;align-items:center;gap:8px;margin-bottom:24px}
+.weeks span{color:var(--muted);margin-right:4px}
+.weeks button{width:44px;height:44px;border-radius:22px;border:1px solid var(--line);background:transparent;font-family:var(--num);font-size:20px;font-weight:600}
+.weeks button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sess{display:grid;grid-template-columns:64px 1fr;gap:4px 16px;align-items:center;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.sess .l{grid-row:span 2;font-family:var(--num);font-weight:700;font-size:56px;line-height:1;text-align:center}
+.sess .n{font-weight:600;font-size:19px}
+.sess .d{color:var(--muted);font-size:15px}
+.note{color:var(--muted);font-size:14px;line-height:1.5;margin-top:20px}
+
+/* Run */
+#run{position:fixed;inset:0;display:flex;flex-direction:column;color:#fff;background:#24476B;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) 18px calc(env(safe-area-inset-bottom,0px) + 14px);transition:background-color .35s}
+@media (prefers-reduced-motion:reduce){#run{transition:none}}
+.z-warm{background:#2F6F73!important}.z-easy{background:#24476B!important}.z-tempo{background:#8A5A0F!important}
+.z-hard{background:#B23A0E!important}.z-max{background:#9E1238!important}.z-cool{background:#3B4A5A!important}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px;opacity:.9}
+.top button{background:rgba(255,255,255,.14);border:0;border-radius:18px;padding:7px 14px;color:#fff}
+#call{font-family:var(--num);font-weight:700;font-size:clamp(48px,15vw,96px);line-height:1;margin-top:14px;transform-origin:left center}
+#call.flash{animation:flash .6s ease-out}
+@keyframes flash{0%{transform:scale(1.25);opacity:.3}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){#call.flash{animation:none}}
+.voice{border:1px solid var(--line);background:transparent;border-radius:20px;padding:8px 14px;font-size:15px;margin-bottom:20px}
+#label{font-family:var(--num);font-weight:600;font-size:24px;margin-top:6px;opacity:.9}
+#work{font-size:19px;opacity:.92;min-height:1.3em}
+#clock{font-family:var(--num);font-weight:700;font-variant-numeric:tabular-nums;font-size:clamp(110px,36vw,240px);line-height:.9;
+  margin:8px 0 12px;letter-spacing:-.01em;user-select:none}
+#clock.soon{opacity:.75}
+.targets{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.t{background:rgba(0,0,0,.18);border-radius:12px;padding:10px 12px}
+.t span{display:block;font-size:14px;opacity:.8}
+.t b{font-family:var(--num);font-weight:700;font-variant-numeric:tabular-nums;font-size:28px;line-height:1.1}
+.t.big b{font-size:52px}
+#next{margin-top:14px;font-size:16px;opacity:.9;min-height:1.3em}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.2);margin-top:auto;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#fff}
+nav{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:10px;margin-top:14px}
+nav button{height:60px;border:0;border-radius:14px;background:rgba(255,255,255,.16);color:#fff;font-size:18px;font-weight:600}
+nav #play{background:#fff;color:#15212C}
+
+/* Done */
+#done{max-width:560px;margin:0 auto;padding:40px 20px}
+#done h2{font-family:var(--num);font-size:44px;margin:0 0 6px}
+#done p{color:var(--muted);margin:0 0 24px}
+#done ol{padding-left:22px;line-height:1.9;font-size:17px;margin:0 0 28px}
+.primary{height:54px;padding:0 22px;border-radius:14px;border:0;background:var(--ink);color:var(--bg);font-weight:600;font-size:17px}
+</style>
+</head>
+<body>
+
+<main id="home">
+  <h1>Spin timer</h1>
+  <p class="sub">Seated throughout. Open palms on the bars.</p>
+  <div class="weeks" role="group" aria-label="Week">
+    <span>Week</span>
+    <button data-w="1" aria-pressed="true">1</button>
+    <button data-w="2" aria-pressed="false">2</button>
+    <button data-w="3" aria-pressed="false">3</button>
+    <button data-w="4" aria-pressed="false">4</button>
+  </div>
+  <button class="voice" id="voice" aria-pressed="true">Voice callouts: on</button>
+  <div id="list"></div>
+  <p class="note">Beeps on the last three seconds of each block. The screen stays awake while a session runs, where your browser allows it. Turn your volume up.</p>
+</main>
+
+<section id="run" hidden aria-live="polite">
+  <div class="top"><button id="quit">End</button><span id="sname"></span><span id="left"></span></div>
+  <div id="call"></div>
+  <div id="label"></div>
+  <div id="work"></div>
+  <div id="clock" role="timer">0:00</div>
+  <div class="targets">
+    <div class="t big"><span>Resistance</span><b id="res"></b></div>
+    <div class="t big"><span>Cadence</span><b id="cad"></b></div>
+    <div class="t"><span>Heart rate</span><b id="hr"></b></div>
+    <div class="t"><span>Effort</span><b id="rpe"></b></div>
+  </div>
+  <div id="next"></div>
+  <div class="bar"><i id="prog"></i></div>
+  <nav><button id="back">Back</button><button id="play">Pause</button><button id="skip">Skip</button></nav>
+</section>
+
+<section id="done" hidden>
+  <h2 id="dtitle">Done</h2>
+  <p id="dsub"></p>
+  <div id="circuit"></div>
+  <button class="primary" id="home-btn">Back to sessions</button>
+</section>
+
+<script>
+const $=id=>document.getElementById(id);
+const seg=(label,work,dur,o)=>Object.assign({label,work,dur},o);
+const easy=(label,dur,hr='Under 70%')=>seg(label,'Easy spin',dur,{rpe:'3',cad:'85',hr,res:'3',zone:'easy'});
+const cool=d=>seg('Cool-down','Drop resistance to nothing',d,{rpe:'2',cad:'80',hr:'Under 60%',res:'1',zone:'cool'});
+
+function sessionA(w){
+  const s=[
+    seg('Warm-up','Easy spin',w>=4?60:180,{rpe:'3–4',cad:'90',hr:'55–65%',res:'3',zone:'warm'}),
+    seg('Warm-up','Build. Three 20s spin-ups to 110+',120,{rpe:'5',cad:'90–110',hr:'65–75%',res:'4',zone:'warm'})
+  ];
+  const n=w>=4?6:5;
+  for(let i=1;i<=n;i++){
+    s.push(seg(`Threshold ${i} of ${n}`,'Hard',60,{rpe:'8',cad:'95–105',hr:'85–90%',res:'6',zone:'hard'}));
+    s.push(seg(`Threshold ${i} of ${n}`,'Easy',60,{rpe:'3',cad:'85',hr:'Under 75%',res:'3',zone:'easy'}));
+  }
+  s.push(easy('Recover',120));
+  [1,2].forEach(c=>{
+    [7,8,9].forEach((r,i)=>s.push(seg(`Climb ${c}`,`Minute ${i+1} of 3. Add a notch`,60,{rpe:'8',cad:'60–70',hr:'85–90%',res:String(r),zone:'hard'})));
+    s.push(easy('Recover',60,'Under 75%'));
+  });
+  [1,2].forEach(i=>s.push(seg('Climb 3',`Minute ${i} of 2. Heaviest of the session`,60,{rpe:'8–9',cad:'60–65',hr:'88–92%',res:'9',zone:'hard'})));
+  s.push(easy('Recover',120));
+  for(let i=1;i<=8;i++){
+    s.push(seg(`Sprint ${i} of 8`,'All-out',30,{rpe:'9–10',cad:'Max',hr:'90%+ by 5',res:'6–7',zone:'max'}));
+    s.push(seg(`Sprint ${i} of 8`,'Easy',30,{rpe:'3',cad:'85',hr:'Let it drop',res:'3',zone:'easy'}));
+  }
+  s.push(cool(180));
+  return s;
+}
+
+function sessionB(w){
+  const long=w>=3,t=long?600:480;
+  return [
+    seg('Warm-up','Easy spin',long?120:240,{rpe:'3',cad:'85–90',hr:'55–65%',res:'3',zone:'warm'}),
+    seg('Warm-up','Build to steady. Two 30s pick-ups',long?120:180,{rpe:'5',cad:'95',hr:'65–75%',res:'4',zone:'warm'}),
+    seg('Tempo 1 of 3','Steady effort. Short phrases only',t,{rpe:'6–7',cad:'85–95',hr:'80–85%',res:'5',zone:'tempo'}),
+    easy('Recover',120),
+    seg('Tempo 2 of 3','One notch up on tempo 1',t,{rpe:'7',cad:'85–95',hr:'82–87%',res:'6',zone:'tempo'}),
+    easy('Recover',120),
+    seg('Tempo 3 of 3','Match tempo 2',t-120,{rpe:'7',cad:'85–95',hr:'82–87%',res:'6',zone:'tempo'}),
+    seg('Tempo 3 of 3','Push cadence to 100+',120,{rpe:'7–8',cad:'100+',hr:'88%+',res:'6',zone:'hard'}),
+    cool(long?120:300)
+  ];
+}
+
+function sessionC(w){
+  const n=w>=4?12:10;
+  const s=[
+    seg('Warm-up','Easy spin',180,{rpe:'3',cad:'90',hr:'55–65%',res:'3',zone:'warm'}),
+    seg('Warm-up','Build. Three 10s spin-ups to 110+',120,{rpe:'5',cad:'90–110',hr:'65–75%',res:'4',zone:'warm'})
+  ];
+  for(let i=1;i<=n;i++){
+    s.push(seg(`Sprint ${i} of ${n}`,'All-out',20,{rpe:'10',cad:'Max',hr:'90%+ by 6',res:'7',zone:'max'}));
+    s.push(seg(`Sprint ${i} of ${n}`,'Easy',40,{rpe:'3',cad:'85',hr:'Let it drop',res:'3',zone:'easy'}));
+  }
+  s.push(easy('Recover',180));
+  for(let i=1;i<=8;i++){
+    s.push(seg(`Tabata ${i} of 8`,'Hard',20,{rpe:'9',cad:'100+',hr:'88–95%',res:'5',zone:'max'}));
+    s.push(seg(`Tabata ${i} of 8`,'Easy',10,{rpe:'3',cad:'85',hr:'Hold on',res:'3',zone:'easy'}));
+  }
+  s.push(easy('Recover',180));
+  s.push(cool(w>=4?180:300));
+  return s;
+}
+
+function callout(s){
+  const w=s.work;
+  if(s.zone==='warm')return 'Warm up';
+  if(s.zone==='cool')return 'Cool down';
+  if(s.zone==='easy')return 'Rest';
+  if(s.label.startsWith('Climb'))return w.startsWith('Minute 1')||s.label==='Climb 3'&&w.startsWith('Minute 1')?'Heavy!':'Heavier!';
+  if(s.label.startsWith('Tabata'))return 'Go!';
+  if(s.zone==='max')return 'Sprint!';
+  if(w.startsWith('Push cadence'))return 'Spin it up!';
+  if(s.zone==='tempo')return 'Hold it';
+  return 'Push!';
+}
+let voice=true;
+function say(t){
+  if(!voice||!('speechSynthesis' in window))return;
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace('!',''));u.rate=1.05;u.volume=1;speechSynthesis.speak(u)}catch(e){}
+}
+function announce(){
+  const s=plan[idx];if(!s)return;
+  const c=callout(s);
+  $('call').textContent=c;
+  $('call').classList.remove('flash');void $('call').offsetWidth;$('call').classList.add('flash');
+  say(s.zone==='easy'||s.zone==='warm'||s.zone==='cool'?c:`${c} Resistance ${s.res.split('–')[0]}`);
+}
+$('voice').onclick=()=>{voice=!voice;$('voice').setAttribute('aria-pressed',voice);$('voice').textContent='Voice callouts: '+(voice?'on':'off')};
+
+const SESSIONS=[
+  {id:'A',name:'Intervals',day:'Monday',desc:'Threshold, climbs, 30/30 sprints',build:sessionA,circuit:false},
+  {id:'B',name:'Tempo',day:'Wednesday',desc:'Three long steady blocks',build:sessionB,circuit:true},
+  {id:'C',name:'Sprints',day:'Saturday',desc:'20s sprints and a Tabata finisher',build:sessionC,circuit:true}
+];
+const CIRCUIT=['15 air squats','10 reverse lunges each leg','15 glute bridges','30s wall sit','10 dead bugs each side','30s forearm plank, injured hand flat'];
+
+let week=1,S=null,plan=[],idx=0,el=0,running=false,last=0,timer=null,beeped=-1,wake=null,audio=null;
+
+const fmt=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const total=p=>p.reduce((a,x)=>a+x.dur,0);
+
+function renderList(){
+  $('list').innerHTML='';
+  SESSIONS.forEach(s=>{
+    const b=document.createElement('button');
+    b.className='sess';
+    b.innerHTML=`<span class="l">${s.id}</span><span class="n">${s.name}</span><span class="d">${s.day}, ${Math.round(total(s.build(week))/60)} min. ${s.desc}</span>`;
+    b.onclick=()=>start(s);
+    $('list').appendChild(b);
+  });
+}
+document.querySelectorAll('.weeks button').forEach(b=>b.onclick=()=>{
+  week=+b.dataset.w;
+  document.querySelectorAll('.weeks button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  renderList();
+});
+
+function beep(f=880,d=.12,v=.25){
+  if(!audio)return;
+  const o=audio.createOscillator(),g=audio.createGain();
+  o.frequency.value=f;o.connect(g);g.connect(audio.destination);
+  const t=audio.currentTime;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
+  o.start(t);o.stop(t+d+.02);
+}
+async function lock(){try{if('wakeLock' in navigator)wake=await navigator.wakeLock.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running)lock()});
+
+function start(s){
+  try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();audio.resume()}catch(e){}
+  S=s;plan=s.build(week);idx=0;el=0;beeped=-1;
+  $('home').hidden=true;$('done').hidden=true;$('run').hidden=false;
+  $('sname').textContent=`Session ${s.id}: ${s.name}`;
+  play();announce();
+}
+function play(){running=true;last=performance.now();$('play').textContent='Pause';lock();
+  clearInterval(timer);timer=setInterval(tick,100);render()}
+function pause(){running=false;$('play').textContent='Resume';clearInterval(timer);render()}
+
+function tick(){
+  const now=performance.now();el+=(now-last)/1000;last=now;
+  while(idx<plan.length&&el>=plan[idx].dur){el-=plan[idx].dur;idx++;beeped=-1;
+    if(idx<plan.length){beep(1320,.45,.3);if(navigator.vibrate)navigator.vibrate(300);announce()}}
+  if(idx>=plan.length)return finish();
+  const rem=Math.ceil(plan[idx].dur-el);
+  if(rem<=3&&rem>=1&&rem!==beeped){beeped=rem;beep(880,.12)}
+  render();
+}
+
+function render(){
+  const s=plan[idx];if(!s)return;
+  const rem=s.dur-el;
+  $('run').className='z-'+s.zone;
+  $('label').textContent=s.label;
+  $('work').textContent=s.work+(running?'':'. Paused');
+  $('clock').textContent=fmt(rem);
+  $('clock').classList.toggle('soon',rem<=3);
+  $('res').textContent=s.res;$('cad').textContent=s.cad;$('hr').textContent=s.hr;$('rpe').textContent=s.rpe;
+  const n=plan[idx+1];
+  $('next').textContent=n?`Next: ${n.work.split('.')[0]}, ${fmt(n.dur)} at resistance ${n.res}`:'Last block';
+  const done=plan.slice(0,idx).reduce((a,x)=>a+x.dur,0)+el,tot=total(plan);
+  $('left').textContent=fmt(tot-done)+' left';
+  $('prog').style.width=(done/tot*100)+'%';
+}
+
+function finish(){
+  clearInterval(timer);say('Done. Nice work');running=false;beep(660,.3);setTimeout(()=>beep(990,.5),350);
+  try{wake&&wake.release()}catch(e){}
+  $('run').hidden=true;$('done').hidden=false;
+  $('dtitle').textContent=`Session ${S.id} done`;
+  $('dsub').textContent=`${Math.round(total(plan)/60)} minutes. Week ${week}.`;
+  const rounds=week>=2?4:3;
+  $('circuit').innerHTML=S.circuit?`<p>Floor circuit next. ${rounds} rounds, 60s between rounds.</p><ol>${CIRCUIT.map(c=>`<li>${c}</li>`).join('')}</ol>`:'';
+}
+
+$('play').onclick=()=>running?pause():play();
+$('clock').onclick=()=>running?pause():play();
+$('skip').onclick=()=>{idx++;el=0;beeped=-1;if(idx>=plan.length)return finish();last=performance.now();render();announce()};
+$('back').onclick=()=>{if(el<3&&idx>0)idx--;el=0;beeped=-1;last=performance.now();render();announce()};
+let quitArm=null;
+$('quit').onclick=()=>{
+  if(quitArm){clearTimeout(quitArm);quitArm=null;clearInterval(timer);running=false;try{wake&&wake.release()}catch(e){}
+    $('run').hidden=true;$('home').hidden=false;$('quit').textContent='End';return}
+  $('quit').textContent='Tap again to end';
+  quitArm=setTimeout(()=>{$('quit').textContent='End';quitArm=null},3000);
+};
+$('home-btn').onclick=()=>{$('done').hidden=true;$('home').hidden=false};
+
+renderList();
+</script>
+</body>
+</html>
