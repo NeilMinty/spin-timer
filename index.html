@@ -613,10 +613,13 @@ async function spPlay(pid){
     const devices=(dd.devices||[]).filter(d=>!d.is_restricted);
     if(!devices.length){spStatus('Spotify: no active device');return;}
     spDeviceId=(devices.find(d=>d.is_active)||devices[0]).id;
-    const r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+spDeviceId,{
-      method:'PUT',headers:h,
-      body:JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}})
-    });
+    const body=JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}});
+    let r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+spDeviceId,
+      {method:'PUT',headers:h,body});
+    if(r.status===404){
+      // Device became stale — retry without device_id
+      r=await fetch('https://api.spotify.com/v1/me/player/play',{method:'PUT',headers:h,body});
+    }
     if(r.ok||r.status===204){
       spStatus('');
       fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
