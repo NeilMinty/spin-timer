@@ -401,10 +401,7 @@ function finish(){
 
 $('play').onclick=()=>running?pause():play();
 $('clock').onclick=()=>running?pause():play();
-$('skip').onclick=()=>{
-  if($('sp-status').textContent.startsWith('Open Spotify')){spPlaySessionRide(S);return;}
-  idx++;el=0;beeped=-1;if(idx>=plan.length)return finish();last=performance.now();render();announce();
-};
+$('skip').onclick=()=>{idx++;el=0;beeped=-1;if(idx>=plan.length)return finish();last=performance.now();render();announce()};
 $('back').onclick=()=>{if(el<3&&idx>0)idx--;el=0;beeped=-1;last=performance.now();render();announce()};
 let quitArm=null;
 $('quit').onclick=()=>{
@@ -614,20 +611,17 @@ async function spPlay(pid){
     const dr=await fetch('https://api.spotify.com/v1/me/player/devices',{headers:h});
     const dd=await dr.json();
     const devices=(dd.devices||[]).filter(d=>!d.is_restricted);
-    spDeviceId=devices.length?(devices.find(d=>d.is_active)||devices[0]).id:null;
+    if(!devices.length){spStatus('Open Spotify on a device, play something, then tap \u25b6 to resume');return;}
+    spDeviceId=(devices.find(d=>d.is_active)||devices[0]).id;
     const body=JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}});
-    const playUrl='https://api.spotify.com/v1/me/player/play'+(spDeviceId?'?device_id='+spDeviceId:'');
-    let r=await fetch(playUrl,{method:'PUT',headers:h,body});
-    if(r.status===404||r.status===202){
-      // Device stale or not ready — retry without device_id
+    let r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+spDeviceId,{method:'PUT',headers:h,body});
+    if(r.status===404){
       r=await fetch('https://api.spotify.com/v1/me/player/play',{method:'PUT',headers:h,body});
     }
     if(r.ok||r.status===204){
       spStatus('');
-      if(spDeviceId)fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
+      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
       spFetchPlaylistName(pid).then(name=>{spCurrentPlaylist=name;});
-    }else if(r.status===404||r.status===202){
-      spStatus('Open Spotify on a device first, then tap Skip to retry');
     }else{
       spStatus('Spotify: error '+r.status);
     }
