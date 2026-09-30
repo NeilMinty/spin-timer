@@ -401,7 +401,10 @@ function finish(){
 
 $('play').onclick=()=>running?pause():play();
 $('clock').onclick=()=>running?pause():play();
-$('skip').onclick=()=>{idx++;el=0;beeped=-1;if(idx>=plan.length)return finish();last=performance.now();render();announce()};
+$('skip').onclick=()=>{
+  if($('sp-status').textContent.startsWith('Open Spotify')){spPlaySessionRide(S);return;}
+  idx++;el=0;beeped=-1;if(idx>=plan.length)return finish();last=performance.now();render();announce();
+};
 $('back').onclick=()=>{if(el<3&&idx>0)idx--;el=0;beeped=-1;last=performance.now();render();announce()};
 let quitArm=null;
 $('quit').onclick=()=>{
@@ -621,10 +624,13 @@ async function spPlay(pid){
     }
     if(r.ok||r.status===204){
       spStatus('');
-      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
+      if(spDeviceId)fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
       spFetchPlaylistName(pid).then(name=>{spCurrentPlaylist=name;});
+    }else if(r.status===404||r.status===202){
+      spStatus('Open Spotify on a device first, then tap Skip to retry');
+    }else{
+      spStatus('Spotify: error '+r.status);
     }
-    else spStatus('Spotify: error '+r.status);
   }catch(e){spStatus('Spotify: unavailable');}
 }
 
