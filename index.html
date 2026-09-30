@@ -122,8 +122,10 @@ nav #play{background:#fff;color:#15212C}
     <div id="sp-connected" hidden>
       <div class="sp-row">
         <span class="sp-ok">Spotify connected</span>
+        <button class="sp-link" id="sp-check-devices">Check devices</button>
         <button class="sp-link" id="sp-disconnect">Disconnect</button>
       </div>
+      <div id="sp-dev-status" class="sp-msg"></div>
       <details class="sp-music">
         <summary>Music</summary>
         <div class="sp-fields">
@@ -494,8 +496,26 @@ function renderSP(){
   }
 }
 
+async function spCheckDevices(){
+  const el=$('sp-dev-status');
+  el.textContent='Checking…';el.className='sp-msg';
+  const token=await spToken();
+  if(!token){el.textContent='Not connected';return;}
+  try{
+    const r=await fetch('https://api.spotify.com/v1/me/player/devices',
+      {headers:{'Authorization':'Bearer '+token}});
+    if(!r.ok){el.textContent='Devices API returned '+r.status;return;}
+    const d=await r.json();
+    const devs=d.devices||[];
+    el.textContent=devs.length
+      ?'Found: '+devs.map(x=>x.name+' ('+x.type+(x.is_active?' — active':x.is_restricted?' — restricted':'')+')').join('; ')
+      :'No devices found — play something in Spotify first';
+  }catch(e){el.textContent='Error: '+e.message;}
+}
+
 $('sp-connect').onclick=()=>spLogin();
 $('sp-disconnect').onclick=()=>spDisconnect();
+$('sp-check-devices').onclick=()=>spCheckDevices();
 function savePLField(key,inputId,msgId){
   const val=$(inputId).value.trim(),msg=$(msgId);
   if(!val){localStorage.removeItem(key);msg.textContent='';msg.className='sp-msg';return true;}
