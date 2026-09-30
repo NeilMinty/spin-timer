@@ -448,14 +448,18 @@ async function spPlay(pid){
   if(!token){spStatus('Spotify: not connected');return;}
   const h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
   try{
-    const r=await fetch('https://api.spotify.com/v1/me/player/play',{
+    const dr=await fetch('https://api.spotify.com/v1/me/player/devices',{headers:h});
+    const dd=await dr.json();
+    const devices=(dd.devices||[]).filter(d=>!d.is_restricted);
+    if(!devices.length){spStatus('Spotify: no active device');return;}
+    const deviceId=(devices.find(d=>d.is_active)||devices[0]).id;
+    const r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+deviceId,{
       method:'PUT',headers:h,
       body:JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}})
     });
-    if(r.status===404)spStatus('Spotify: no active device');
-    else if(r.ok||r.status===204){
+    if(r.ok||r.status===204){
       spStatus('');
-      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true',{method:'PUT',headers:h}).catch(()=>{});
+      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+deviceId,{method:'PUT',headers:h}).catch(()=>{});
     }
     else spStatus('Spotify: error '+r.status);
   }catch(e){spStatus('Spotify: unavailable');}
