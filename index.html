@@ -93,6 +93,9 @@ nav #play{background:#fff;color:#15212C}
 .sp-music>summary{font-size:15px;cursor:pointer;padding:4px 0;color:var(--muted)}
 .sp-sess-head{font-size:13px;font-weight:600;color:var(--ink);margin:14px 0 2px}
 #sp-status{font-size:13px;opacity:.65;min-height:1.2em;margin-top:6px}
+#sp-now{margin-top:8px;line-height:1.4}
+#sp-now-playlist{font-size:12px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sp-now-track{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Done */
 #done{max-width:560px;margin:0 auto;padding:40px 20px}
@@ -166,6 +169,10 @@ nav #play{background:#fff;color:#15212C}
     <div class="t"><span>Effort</span><b id="rpe"></b></div>
   </div>
   <div id="next"></div>
+  <div id="sp-now" hidden>
+    <div id="sp-now-playlist"></div>
+    <div id="sp-now-track"></div>
+  </div>
   <div id="sp-status"></div>
   <div class="bar"><i id="prog"></i></div>
   <nav><button id="back">Back</button><button id="play">Pause</button><button id="skip">Skip</button></nav>
@@ -314,7 +321,7 @@ function start(s){
   S=s;plan=s.build(week);idx=0;el=0;beeped=-1;
   $('home').hidden=true;$('done').hidden=true;$('run').hidden=false;
   $('sname').textContent=`Session ${s.id}: ${s.name}`;
-  inSprintSet=false;spStatus('');spPlaySessionRide(s);
+  inSprintSet=false;spStatus('');spPlaySessionRide(s);spStartPoll();
   play();announce();
 }
 function play(){running=true;last=performance.now();$('play').textContent='Pause';lock();
@@ -352,6 +359,7 @@ function render(){
 function finish(){
   clearInterval(timer);say('Done. Nice work');running=false;beep(660,.3);setTimeout(()=>beep(990,.5),350);
   try{wake&&wake.release()}catch(e){}
+  spStopPoll();
   $('run').hidden=true;$('done').hidden=false;
   $('dtitle').textContent=`Session ${S.id} done`;
   $('dsub').textContent=`${Math.round(total(plan)/60)} minutes. Week ${week}.`;
@@ -366,7 +374,7 @@ $('back').onclick=()=>{if(el<3&&idx>0)idx--;el=0;beeped=-1;last=performance.now(
 let quitArm=null;
 $('quit').onclick=()=>{
   if(quitArm){clearTimeout(quitArm);quitArm=null;clearInterval(timer);running=false;try{wake&&wake.release()}catch(e){}
-    $('run').hidden=true;$('home').hidden=false;$('quit').textContent='End';return}
+    spStopPoll();$('run').hidden=true;$('home').hidden=false;$('quit').textContent='End';return}
   $('quit').textContent='Tap again to end';
   quitArm=setTimeout(()=>{$('quit').textContent='End';quitArm=null},3000);
 };
@@ -446,7 +454,41 @@ function parsePid(url){
 
 function spStatus(msg){const el=$('sp-status');if(el)el.textContent=msg||'';}
 
-let spDeviceId=null;
+let spDeviceId=null,spPollTimer=null,spCurrentPlaylist='';
+
+async function spFetchPlaylistName(pid){
+  const token=await spToken();if(!token)return'';
+  try{
+    const r=await fetch('https://api.spotify.com/v1/playlists/'+pid+'?fields=name',
+      {headers:{'Authorization':'Bearer '+token}});
+    const d=await r.json();return d.name||'';
+  }catch(e){return'';}
+}
+
+async function spPollNow(){
+  const token=await spToken();if(!token)return;
+  try{
+    const r=await fetch('https://api.spotify.com/v1/me/player',
+      {headers:{'Authorization':'Bearer '+token}});
+    if(r.status===204||!r.ok){$('sp-now').hidden=true;return;}
+    const d=await r.json();
+    if(d.is_playing&&d.item){
+      $('sp-now-playlist').textContent=spCurrentPlaylist;
+      $('sp-now-track').textContent=d.item.name;
+      $('sp-now').hidden=false;
+    }else{$('sp-now').hidden=true;}
+  }catch(e){$('sp-now').hidden=true;}
+}
+
+function spStartPoll(){
+  spStopPoll();
+  spPollTimer=setInterval(spPollNow,5000);
+  spPollNow();
+}
+function spStopPoll(){
+  clearInterval(spPollTimer);spPollTimer=null;
+  $('sp-now').hidden=true;
+}
 
 async function spPause(){
   const token=await spToken();if(!token)return;
@@ -479,6 +521,7 @@ async function spPlay(pid){
     if(r.ok||r.status===204){
       spStatus('');
       fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
+      spFetchPlaylistName(pid).then(name=>{spCurrentPlaylist=name;});
     }
     else spStatus('Spotify: error '+r.status);
   }catch(e){spStatus('Spotify: unavailable');}
