@@ -318,8 +318,10 @@ function start(s){
   play();announce();
 }
 function play(){running=true;last=performance.now();$('play').textContent='Pause';lock();
-  clearInterval(timer);timer=setInterval(tick,100);render()}
-function pause(){running=false;$('play').textContent='Resume';clearInterval(timer);render()}
+  clearInterval(timer);timer=setInterval(tick,100);render();
+  if(el>0||idx>0)spResume().catch(()=>{});}
+function pause(){running=false;$('play').textContent='Resume';clearInterval(timer);render();
+  spPause().catch(()=>{});}
 
 function tick(){
   const now=performance.now();el+=(now-last)/1000;last=now;
@@ -443,6 +445,17 @@ function parsePid(url){
 }
 
 function spStatus(msg){const el=$('sp-status');if(el)el.textContent=msg||'';}
+
+async function spPause(){
+  const token=await spToken();if(!token)return;
+  try{await fetch('https://api.spotify.com/v1/me/player/pause',
+    {method:'PUT',headers:{'Authorization':'Bearer '+token}});}catch(e){}
+}
+async function spResume(){
+  const token=await spToken();if(!token)return;
+  try{await fetch('https://api.spotify.com/v1/me/player/play',
+    {method:'PUT',headers:{'Authorization':'Bearer '+token}});}catch(e){}
+}
 
 async function spPlay(pid){
   if(!pid)return;
