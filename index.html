@@ -636,16 +636,19 @@ async function spPlay(pid){
   const h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
   try{
     const device=await spPickDevice(token);
-    if(!device){spStatus('Open Spotify on your phone and press play once');return;}
-    spDeviceId=device.id;
-    console.log('[Spotify] targeting:',device.name,'('+device.type+', '+device.id+')');
-    spStatus('Playing on '+device.name);
+    if(device){
+      spDeviceId=device.id;
+      console.log('[Spotify] targeting:',device.name,'('+device.type+', '+device.id+')');
+    }else{
+      console.log('[Spotify] no device found — firing play without device_id');
+    }
     const body=JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}});
-    const r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+spDeviceId,
-      {method:'PUT',headers:h,body});
+    const url='https://api.spotify.com/v1/me/player/play'+(spDeviceId?'?device_id='+spDeviceId:'');
+    const r=await fetch(url,{method:'PUT',headers:h,body});
     if(r.ok||r.status===204||r.status===202){
-      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,
-        {method:'PUT',headers:h}).catch(()=>{});
+      spStatus(device?'Playing on '+device.name:'');
+      const shuffleUrl='https://api.spotify.com/v1/me/player/shuffle?state=true'+(spDeviceId?'&device_id='+spDeviceId:'');
+      fetch(shuffleUrl,{method:'PUT',headers:h}).catch(()=>{});
       spFetchPlaylistName(pid).then(name=>{spCurrentPlaylist=name;});
     }else{
       await spSpotifyErr(r,'Play:');
