@@ -446,14 +446,18 @@ function parsePid(url){
 
 function spStatus(msg){const el=$('sp-status');if(el)el.textContent=msg||'';}
 
+let spDeviceId=null;
+
 async function spPause(){
   const token=await spToken();if(!token)return;
-  try{await fetch('https://api.spotify.com/v1/me/player/pause',
+  const q=spDeviceId?'?device_id='+spDeviceId:'';
+  try{await fetch('https://api.spotify.com/v1/me/player/pause'+q,
     {method:'PUT',headers:{'Authorization':'Bearer '+token}});}catch(e){}
 }
 async function spResume(){
   const token=await spToken();if(!token)return;
-  try{await fetch('https://api.spotify.com/v1/me/player/play',
+  const q=spDeviceId?'?device_id='+spDeviceId:'';
+  try{await fetch('https://api.spotify.com/v1/me/player/play'+q,
     {method:'PUT',headers:{'Authorization':'Bearer '+token}});}catch(e){}
 }
 
@@ -467,14 +471,14 @@ async function spPlay(pid){
     const dd=await dr.json();
     const devices=(dd.devices||[]).filter(d=>!d.is_restricted);
     if(!devices.length){spStatus('Spotify: no active device');return;}
-    const deviceId=(devices.find(d=>d.is_active)||devices[0]).id;
-    const r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+deviceId,{
+    spDeviceId=(devices.find(d=>d.is_active)||devices[0]).id;
+    const r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+spDeviceId,{
       method:'PUT',headers:h,
       body:JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}})
     });
     if(r.ok||r.status===204){
       spStatus('');
-      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+deviceId,{method:'PUT',headers:h}).catch(()=>{});
+      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
     }
     else spStatus('Spotify: error '+r.status);
   }catch(e){spStatus('Spotify: unavailable');}
