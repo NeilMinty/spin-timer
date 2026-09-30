@@ -609,19 +609,25 @@ async function spPlay(pid){
   const h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
   try{
     const dr=await fetch('https://api.spotify.com/v1/me/player/devices',{headers:h});
-    const dd=await dr.json();
-    const devices=(dd.devices||[]).filter(d=>!d.is_restricted);
-    if(!devices.length){spStatus('Open Spotify on a device, play something, then tap \u25b6 to resume');return;}
-    spDeviceId=(devices.find(d=>d.is_active)||devices[0]).id;
+    if(dr.ok){
+      const dd=await dr.json();
+      const devices=(dd.devices||[]).filter(d=>!d.is_restricted);
+      spDeviceId=devices.length?(devices.find(d=>d.is_active)||devices[0]).id:null;
+    }else{
+      spDeviceId=null;
+    }
     const body=JSON.stringify({context_uri:'spotify:playlist:'+pid,offset:{position:0}});
-    let r=await fetch('https://api.spotify.com/v1/me/player/play?device_id='+spDeviceId,{method:'PUT',headers:h,body});
-    if(r.status===404){
+    const playUrl='https://api.spotify.com/v1/me/player/play'+(spDeviceId?'?device_id='+spDeviceId:'');
+    let r=await fetch(playUrl,{method:'PUT',headers:h,body});
+    if(r.status===404&&spDeviceId){
       r=await fetch('https://api.spotify.com/v1/me/player/play',{method:'PUT',headers:h,body});
     }
-    if(r.ok||r.status===204){
+    if(r.ok||r.status===204||r.status===202){
       spStatus('');
-      fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
+      if(spDeviceId)fetch('https://api.spotify.com/v1/me/player/shuffle?state=true&device_id='+spDeviceId,{method:'PUT',headers:h}).catch(()=>{});
       spFetchPlaylistName(pid).then(name=>{spCurrentPlaylist=name;});
+    }else if(r.status===404){
+      spStatus('No Spotify device found \u2014 open Spotify and play something first');
     }else{
       spStatus('Spotify: error '+r.status);
     }
